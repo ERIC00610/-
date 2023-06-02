@@ -5,7 +5,6 @@ from tkinter import messagebox
 
 import csv
 import ast
-
 # 讀取美國官網檔案
 fn = '2_lamerAm_info.csv'
 file_am = []
@@ -38,7 +37,6 @@ ele = soup.find('span', class_='DFlfde SwHCTb')
 exchange_rate = float(ele.text)
 
 # 資料處理
-
 # 美國官網價錢轉換成台幣並製作兩邊網站共有商品的列表
 
 final_product_lst = []
@@ -49,13 +47,11 @@ for product_tw in file_tw:
             product_tw['商品國外價格'] = product_am['商品價格']
             final_product_lst.append(product_tw)
             identifier.add(product_tw['商品英文名稱'])
-#把價格換成int
 
 for product in final_product_lst:
     product['商品價格'] = ast.literal_eval(product['商品價格'])
     product['商品國外價格'] = ast.literal_eval(product['商品國外價格'])
         
-# 
 for product in final_product_lst:
     return_rate = []
     returns = 0
@@ -71,7 +67,7 @@ for product in final_product_lst:
             if returns > return_rate:
                 return_rate = returns
                 price = i[1] * exchange_rate
-        product['報酬率'] = return_rate
+        product['報酬率'] = [return_rate]
         product['商品國外價格'] = [price]
     if type(product['商品價格'][0]) == list and type(product['商品國外價格'][0]) == list:
         return_rate = []
@@ -85,7 +81,19 @@ for product in final_product_lst:
                     pro.append(returns)
             return_rate.append(pro)
             product['報酬率'] = return_rate
-        
+
+for product in final_product_lst:
+    try:
+        if isinstance(product['報酬率'][0], list):
+            # print(11)
+            product['商品價格'] = sorted(product['商品價格'], key = lambda x: x[1])
+            product['商品國外價格'] = sorted(product['商品國外價格'], key = lambda x: x[1])
+            product['報酬率'] = sorted(product['報酬率'], key = lambda x: x[1])
+    except KeyError:
+            pass
+# 
+
+
 def Returns(exp_returns, cost):
     return_lst = []
     exp_returns = int(exp_returns)
@@ -93,15 +101,27 @@ def Returns(exp_returns, cost):
     for i in range(len(final_product_lst)):
         return_pro = {}
         try:
-            if type(final_product_lst[i]['報酬率']) == float:
-                if (final_product_lst[i]['報酬率'] * cost >= exp_returns) and (cost > final_product_lst[i]['商品國外價格'][0]):
+            if isinstance(final_product_lst[i]['報酬率'][0], float):
+                if (final_product_lst[i]['報酬率'][0] * cost >= exp_returns) and (cost > final_product_lst[i]['商品國外價格'][0]):
+                    # print(final_product_lst[i])
                     return_pro['商品名'] = final_product_lst[i]['商品中文名稱']
-                    return_pro['所需購買數量'] = cost // final_product_lst[i]['商品國外價格'][0]
+                    return_pro['報酬率'] = round(final_product_lst[i]['報酬率'][0],3)
+                    return_pro['至少所需購買數量'] = (exp_returns // (final_product_lst[i]['商品國外價格'][0] * exchange_rate)) + 1
                     return_lst.append(return_pro)
         except KeyError:
             pass
+        try:
+            if isinstance(final_product_lst[i]['報酬率'][0], list):
+                for j in range(len(final_product_lst[i]['報酬率'])):
+                    if (final_product_lst[i]['報酬率'][j][1] * cost >= exp_returns) and (cost > final_product_lst[i]['報酬率'][j][1]):
+                        return_pro = {}
+                        return_pro['商品名'] = final_product_lst[i]['商品中文名稱'] + ', 容量：' + final_product_lst[i]['報酬率'][j][0]
+                        return_pro['報酬率'] = round(final_product_lst[i]['報酬率'][j][1],3)
+                        return_pro['至少所需購買數量'] = (exp_returns // (final_product_lst[i]['商品國外價格'][j][1] * exchange_rate)) + 1
+                        return_lst.append(return_pro)
+        except KeyError:
+            pass
     return return_lst
-
 
 
 
@@ -161,7 +181,7 @@ class output_page(tk.Frame):
         fontstyle1 = tkFont.Font(size=20, family="Noto Sans CJK TC Regular")
         # 說明文字
         self.instruction = tk.Label(self, text="根據您的輸入，推薦的產品組合如下：", font=fontstyle1)
-        self.instruction.grid(row=0, column=0, columnspan=2)
+        self.instruction.grid(row=0, column=0, columnspan=3)
         # 結果顯示
         outputlist = Returns(expected_reward_input, cost_input)
         if outputlist == []:
@@ -170,14 +190,18 @@ class output_page(tk.Frame):
         else:
             self.name = tk.Label(self, text="商品名", font=fontstyle1)
             self.name.grid(row=1, column=0)
-            self.num = tk.Label(self, text="所需購買數量", font=fontstyle1)
+            self.num = tk.Label(self, text="至少所需購買數量", font=fontstyle1)
             self.num.grid(row=1, column=1)
+            self.return_rate = tk.Label(self, text="報酬率", font=fontstyle1)
+            self.return_rate.grid(row=1, column=2)
             for i in range(len(outputlist)):
                 product_data= list(outputlist[i].values())
                 self.showproduct = tk.Label(self, text=product_data[0], font=fontstyle0, bg="white")
                 self.showproduct.grid(row=i + 2, column=0, sticky=tk.N+tk.S+tk.W+tk.E)
-                self.shownum = tk.Label(self, text=product_data[1], font=fontstyle0, bg="white")
+                self.shownum = tk.Label(self, text=product_data[2], font=fontstyle0, bg="white")
                 self.shownum.grid(row=i + 2, column=1, sticky=tk.N+tk.S+tk.W+tk.E)
+                self.show_return_rate = tk.Label(self, text=product_data[1], font=fontstyle0, bg="white")
+                self.show_return_rate.grid(row=i + 2, column=2, sticky=tk.N+tk.S+tk.W+tk.E)
         
 
 page = requirement_page()
